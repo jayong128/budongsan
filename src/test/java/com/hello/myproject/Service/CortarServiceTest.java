@@ -22,13 +22,18 @@ class CortarServiceTest {
     void findBuildingList() {
         List<ComplexDto> buildingList = cortarService.findBuildingList("4145010900");
         for (ComplexDto complexDto : buildingList) {
-            log.info("name = {}, dealcnt = {}", complexDto.getHscpNm(), complexDto.getDealCnt());
+            log.info("name = {}, dealcnt = {}, code = {}", complexDto.getHscpNm(), complexDto.getDealCnt(), complexDto.getHscpNo());
         }
     }
 
     @Test
     void findArticleList() {
-        Integer articleList = cortarService.findArticleList("105286");
-        log.info("size = {}",articleList);
+        List<Article> articleList = cortarService.findArticleList("105286");
+        log.info("size = {}",articleList.size());
+    }
+
+    @Test
+    void findBuildingAndArticle() throws InterruptedException {
+        List<Article> articleListByArea = cortarService.findArticleListByArea("4145010900");
     }
 }

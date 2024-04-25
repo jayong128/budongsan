@@ -1,5 +1,6 @@
 package com.hello.myproject.Service;
 
+import com.hello.myproject.config.RandomUserAgent;
 import com.hello.myproject.entity.Article;
 import com.hello.myproject.entity.ComplexDto;
 import com.hello.myproject.entity.ComplexResponseDto;
@@ -14,6 +15,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -23,7 +25,7 @@ import java.util.stream.Collectors;
 public class CortarService {
     private final RestTemplate restTemplate;
     private final UriBuilderService uriBuilderService;
-    private static final String GET_BUILDING_LIST = "https://m.land.naver.com/complex/ajax/complexListByCortarNo";
+    private final RandomUserAgent randomUserAgent;
 
     public List<ComplexDto> findBuildingList(String code) {
         if(!StringUtils.hasText(code)) return null;
@@ -37,23 +39,42 @@ public class CortarService {
                 .collect(Collectors.toList());
     }
 
-    public Integer findArticleList(String code) {
+    public List<Article> findArticleList(String code) {
         if(!StringUtils.hasText(code)) return null;
-        String nextExist = "Y";
-        int page = 1;
-        while (nextExist.equals("Y")) {
-            URI uri = uriBuilderService.buildArticleListUri(code, page);
-            ComplexResponseRes result = restTemplate.exchange(uri, HttpMethod.GET, getHttpEntityHeader(), ComplexResponseRes.class).getBody();
-            log.info("uri = {}", uri);
-            page++;
-            nextExist = result.getResult().getNextPage();
+        List<Article> res = new ArrayList<>();
+        URI totalUri = uriBuilderService.buildArticleListUri(code, 0);
+        Integer total = restTemplate.exchange(totalUri, HttpMethod.GET, getHttpEntityHeader(), ComplexResponseRes.class).getBody()
+                .getResult().getTotal();
+        int endPage = total/20+1;
+        try {
+            for (int page=1; page<=endPage; page++){
+                URI uri = uriBuilderService.buildArticleListUri(code, page);
+                ComplexResponseRes result = restTemplate.exchange(uri, HttpMethod.GET, getHttpEntityHeader(), ComplexResponseRes.class).getBody();
+                res.addAll(result.getResult().getList());
+            }
+            log.info("res size = {}",res.size());
+            return res;
+        } catch (Exception e) {
+            return null;
         }
-        return page;
     }
 
-    private static HttpEntity<Object> getHttpEntityHeader() {
+    public List<Article> findArticleListByArea(String code) throws InterruptedException {
+        if(!StringUtils.hasText(code)) return null;
+        List<Article> result = new ArrayList<>();
+        List<ComplexDto> buildingList = findBuildingList(code);
+
+        for (ComplexDto complexDto : buildingList) {
+            Thread.sleep(randomUserAgent.getRandomDelayTime());
+            List<Article> articleList = findArticleList(complexDto.getHscpNo());
+            result.addAll(articleList);
+        }
+        return result;
+    }
+    private HttpEntity<Object> getHttpEntityHeader() {
         HttpHeaders headers = new HttpHeaders();
-        headers.set(HttpHeaders.USER_AGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3");
+        String userAgent = randomUserAgent.getRandomUserAgent();
+        headers.set(HttpHeaders.USER_AGENT, userAgent);
         HttpEntity<Object> httpEntity = new HttpEntity<>(headers);
         return httpEntity;
     }
